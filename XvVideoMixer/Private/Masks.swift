@@ -44,10 +44,10 @@ class Masks:UIViewController {
             let imageView:UIImageView = UIImageView(image: image)
             
             if (image.size.width > image.size.height) {
-                imageView.contentMode = UIViewContentMode.scaleAspectFit
+                imageView.contentMode = UIView.ContentMode.scaleAspectFit
                 //since the width > height we may fit it and we'll have bands on top/bottom
             } else {
-                imageView.contentMode = UIViewContentMode.scaleAspectFill
+                imageView.contentMode = UIView.ContentMode.scaleAspectFill
                 //width < height we fill it until width is taken up and clipped on top/bottom
             }
             

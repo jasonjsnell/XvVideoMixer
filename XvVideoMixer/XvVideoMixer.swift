@@ -13,7 +13,17 @@ public class XvVideoMixer {
     
     //MARK: Vars
     
+    fileprivate let debug:Bool = true
+    
+    fileprivate var _autoPilotTimer:Timer = Timer()
+    fileprivate var _autoPilotEnabled:Bool = true
+    public var autoPilotEnabled:Bool {
+        get { return _autoPilotEnabled }
+        set { _autoPilotEnabled = newValue }
+    }
+    
     fileprivate var _timeSinceContact:Int = 0
+    
     fileprivate let FPS_24:TimeInterval = 0.041667
     fileprivate let FADE_OUT_INC:CGFloat = 0.25
     
@@ -49,25 +59,27 @@ public class XvVideoMixer {
         }
     }
     
+    //length of time of pulse anim
+    //short times are just a brief burst of image
     fileprivate var _release:Float = 0.0
     public var release:Float {
         get { return _release }
         set { _release = newValue }
     }
     
-    fileprivate var _autoPilot:Bool = false
-    fileprivate var _autoPilotTimer:Timer = Timer()
-    public var autoPilot:Bool {
-        get { return _autoPilot }
-        set { _autoPilot = newValue }
-    }
+
+    
     
     //access to the channels view, which contains all indivudal channels and clips
     public var videoMixerView:UIView {
         get { return _videoMixer.view }
     }
     
-    fileprivate let debug:Bool = true
+    public func set(scale:CGFloat){
+        _videoMixer.view.transform = CGAffineTransform(scaleX: scale, y: scale);
+    }
+    
+    
     
     //MARK: Init
     //singleton code
@@ -81,21 +93,26 @@ public class XvVideoMixer {
     }
     
     //MARK: Add
+    //init channel with full alpha
     public func addChannel(withVideoClipFileNames:[String]){
         
-        _channels.addChannel(withVideoClipFileNames: withVideoClipFileNames)
+        addChannel(withVideoClipFileNames: withVideoClipFileNames, withRestingtAlpha: 1.0)
+    }
+    
+    //init channel with target alpha
+    public func addChannel(withVideoClipFileNames:[String], withRestingtAlpha:CGFloat){
+        
+        _channels.addChannel(withVideoClipFileNames: withVideoClipFileNames, withRestingtAlpha: withRestingtAlpha)
     }
     
     public func addMask(withImageName:String) {
         
         _masks.addMask(withImageName: withImageName)
-        
     }
     
     public func addMask(withImageName:String, withAlpha: CGFloat) {
         
         _masks.addMask(withImageName: withImageName, withAlpha: withAlpha)
-        
     }
     
     //MARK: Playback
@@ -129,7 +146,6 @@ public class XvVideoMixer {
         //render the channels
         _channels.render()
         
-        
         if (_clockDivider > 0){
             
             //if clock is not zero, fade out the channels (the pulse brings them back up)
@@ -155,23 +171,37 @@ public class XvVideoMixer {
         }
         
         //time since contact
+        
         if (debug){
             if (_timeSinceContact > 0){
-                print("VIDEO: Time since contact:", _timeSinceContact)
+                //print("VIDEO: Time since contact:", _timeSinceContact)
             }
         }
         
-        
+        //up count
         _timeSinceContact += 1
-        if (_timeSinceContact == 10){
-            
-            _launchAutoPilot()
         
+        //launch autopilot if enabled
+        if (_timeSinceContact == 25){
+            
+            if (_autoPilotEnabled) {
+                
+                _launchAutoPilot()
+            }
+            
         } else if (_timeSinceContact > 250){
             
-            _timeSinceContact = 11
-             Utils.postNotification(name: "kXvBluetoothScanRequest", userInfo: nil)
+            //else set clock back
+            _timeSinceContact = 101
+            
+            //and make a search for bluetooth devices
+            //print("XvVideoMixer scan request")
+            Utils.postNotification(name: "kXvBluetoothScanRequest", userInfo: nil)
         }
+        
+        
+        
+        
     }
     
     //MARK: Pulse
@@ -182,6 +212,23 @@ public class XvVideoMixer {
         
         _channels.alpha = newAlpha
         _masks.alpha = newAlpha * _maskAlpha
+    }
+    
+    public func pulse(channel:Int){
+        
+        //contact is being made, put var to zero
+        _timeSinceContact = 0
+        
+        //force clock divider to be zero, so tempo pulse doesn't occur
+        _clockDivider = 0
+        
+        //bring up the channels and the masks
+        _channels.alpha = _masterAlpha
+        _masks.alpha = _masterAlpha
+        
+        //set channel alpha
+        _channels.pulse(channel: channel)
+
     }
     
     //MARK: MIDI clock
@@ -214,6 +261,12 @@ public class XvVideoMixer {
     }
     
     
+    //MARK: Multiply render mode
+    public func set(multiply:Bool, forChannel:Int) {
+        
+        _channels.set(multiply: multiply, forChannel: forChannel)
+    }
+    
     //MARK: Alpha
     public func set(alpha:CGFloat, forChannel:Int){
         
@@ -227,7 +280,15 @@ public class XvVideoMixer {
     
     public var masterAlpha:CGFloat {
         get { return _masterAlpha }
-        set { _masterAlpha = newValue }
+        set {
+            
+            _masterAlpha = newValue
+            
+            if (debug){
+                print("CHANNELS: Set master alpha to", newValue)
+            }
+            
+        }
     }
     
     public var maskAlpha:CGFloat {
@@ -243,6 +304,8 @@ public class XvVideoMixer {
     }
     
     //MARK: AutoPilot
+    
+    
     
     fileprivate func _launchAutoPilot(){
         
@@ -264,7 +327,7 @@ public class XvVideoMixer {
         //add lfos to all the channels
         for c in 0..<_channels.total {
             
-            let randomFloat:Float = Utils.getRandomFloat(betweenMin: 0.001, andMax: 0.05)
+            let randomFloat:Float = Utils.getRandomFloat(betweenMin: 0.001, andMax: 0.025)
             let randomCGFloat:CGFloat = CGFloat(randomFloat)
             
             if (debug){ print("VIDEO: Set channel LFO inc to", randomCGFloat) }

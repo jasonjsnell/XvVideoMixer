@@ -15,11 +15,24 @@ class Channel:UIViewController {
     fileprivate let SCALE:Int32 = 600 //same as normal player
     fileprivate let SPEED_BASE:Int64 = 25
     
+    fileprivate let PULSE_ALPHA_DECREASE_INC:CGFloat = 0.01
     
-    fileprivate var _layers:[AVPlayerLayer] = []
-    fileprivate var _selectedLayer:Int = 0
+    fileprivate var _bundlePaths:[String] = []
+    fileprivate var _avPlayerLayer:AVPlayerLayer?
+    
+    fileprivate var _selectedClip:Int = 0
     fileprivate var _currTime:Int64 = 0
     fileprivate var _currSpeed:Int64 = 25
+    
+    //this is the alpha set by the incoming knob data
+    //alpha cannot go above this
+    fileprivate var _targetAlpha:CGFloat = 1.0
+    
+    //when a pulse is complete, this is the alpha the channel drifts down to
+    fileprivate var _restingAlpha:CGFloat = 1.0
+    
+    //render mode
+    fileprivate var _multiply:Bool = false
     
     fileprivate let debug:Bool = false
     
@@ -45,47 +58,83 @@ class Channel:UIViewController {
             
             if let bundlePath:String = Utils.getBundlePath(fromFileName: fileName) {
                 
-                let _videoLayer:AVPlayerLayer = _addVideoLayer(withBundlePath: bundlePath)
-                _layers.append(_videoLayer)
+                _bundlePaths.append(bundlePath)
                 
             } else {
                 print("VIDEO: Error getting bundle name from", fileName)
             }
         }
         
-        _queueClip()
+        _newClip(atTime: 0)
     }
     
     //MARK: Render
+    
+    internal func set(multiply:Bool) {
+        _multiply = multiply
+    }
 
     internal func render(){
         
+        if (_multiply){
+            self.view.layer.compositingFilter = "multiplyBlendMode"
+        }
+        
         _currTime += _currSpeed
         
-        let newCMTime:CMTime = CMTimeMake(_currTime, SCALE)
+        let newCMTime:CMTime = CMTimeMake(value: _currTime, timescale: SCALE)
         
-        if let item:AVPlayerItem = _layers[_selectedLayer].player?.currentItem {
+        if (_avPlayerLayer != nil) {
             
-            if (newCMTime < item.asset.duration){
+            if let item:AVPlayerItem = _avPlayerLayer!.player?.currentItem {
                 
-                if (debug){
-                    print("CHANNEL: Clip", _selectedLayer, ",", newCMTime.value, "/", item.asset.duration.value)
+                if (newCMTime < item.asset.duration){
+                    
+                    if (debug){
+                        print("CHANNEL: Clip", _selectedClip, ",", newCMTime.value, "/", item.asset.duration.value)
+                    }
+                    
+                    _avPlayerLayer!.player!.seek(
+                        to: newCMTime,
+                        toleranceBefore: CMTime.zero,
+                        toleranceAfter: CMTime.zero
+                    )
+                    
+                } else {
+                    
+                    _newClip(atTime: 0)
                 }
                 
-                _layers[_selectedLayer].player!.seek(
-                    to: newCMTime,
-                    toleranceBefore: kCMTimeZero,
-                    toleranceAfter: kCMTimeZero
-                )
-                
             } else {
-                
-                _queueClip()
+                print("CHANNEL: unable to get video player layer", _selectedClip)
             }
-        
+            
         } else {
-            print("CHANNEL: unable to get video player layer", _selectedLayer)
+            print("CHANNEL: _avPlayerLayer is nil during render")
         }
+        
+        //channel pulse
+        if (self.view.alpha > _restingAlpha){
+            
+            let newAlpha:CGFloat = self.view.alpha - PULSE_ALPHA_DECREASE_INC
+            if (newAlpha >= 0.0){
+                self.view.alpha = newAlpha
+            }
+            
+            
+        }
+        
+    }
+    
+    //MARK: Pulse
+    
+    internal func pulse(){
+        
+        let randomInt:Int = Utils.getRandomInt(within: 1000)
+        let randomInt64:Int64 = Int64(randomInt)
+        _newClip(atTime: randomInt64)
+        set(alpha: 1.0 * _targetAlpha)
+        
     }
     
     //MARK: Alpha
@@ -93,7 +142,21 @@ class Channel:UIViewController {
     internal func set(alpha:CGFloat) {
         
         if (alpha >= 0.0 && alpha <= 1.0){
+            _targetAlpha = alpha
             self.view.alpha = alpha
+            
+            if (debug){
+                print("CHANNEL: Set alpha to", alpha)
+            }
+        }
+        
+    }
+    
+    //channel pulse
+    internal func set(restingAlpha:CGFloat){
+        
+        if (restingAlpha >= 0.0 && restingAlpha <= 1.0){
+            _restingAlpha = restingAlpha
         }
         
     }
@@ -173,6 +236,11 @@ class Channel:UIViewController {
     
     internal func set(speed:Float){
         
+        if (debug){
+            print("CHANNEL: Set speed to", speed)
+        }
+        
+        
         //speed is coming in as a 0.0-1.0 float. Double it so midway (0.5) is normal speed, below is slower, above is faster
         let multiplier:Float = speed * 2
        
@@ -190,32 +258,33 @@ class Channel:UIViewController {
     
     //MARK: Private helpers
     
-    fileprivate func _queueClip(){
+    fileprivate func _newClip(atTime:Int64){
         
-        //reset time
-        _currTime = 0
+        _currTime = atTime
+        
+        _newClip()
+    }
+    
+    fileprivate func _newClip(){
         
         
         //generate new random clip if layers has more than one clip
-        if (_layers.count > 1) {
+        if (_bundlePaths.count > 1) {
             
-            var _newLayer:Int = _selectedLayer
+            var _newClip:Int = _selectedClip
            
+            //make sure it doesn't select same clip as last time
             repeat {
                 
-                _newLayer = Utils.getRandomInt(within: _layers.count)
+                _newClip = Utils.getRandomInt(within: _bundlePaths.count)
                 
-            } while (_newLayer == _selectedLayer)
+            } while (_newClip == _selectedClip)
             
-            _selectedLayer = _newLayer
-           
-            if (debug){
-                print("CHANNEL: New clip", _selectedLayer, _layers[_selectedLayer].player?.currentItem?.asset as Any)
-            }
+            _selectedClip = _newClip
             
         } else {
             
-            _selectedLayer = 0
+            _selectedClip = 0
         }
         
         //remove curr sub layers
@@ -225,14 +294,24 @@ class Channel:UIViewController {
             }
         }
         
-        //add new sub layer
-        self.view.layer.addSublayer(_layers[_selectedLayer])
+        //clear previous player
+        _avPlayerLayer = nil
+        
+        //create new av player layer with selected clip
+        _avPlayerLayer = _getAvPlayerLayer(fromBundlePath: _bundlePaths[_selectedClip])
+        
+        //add as sub layer
+        self.view.layer.addSublayer(_avPlayerLayer!)
+        
+        if (debug){
+            print("CHANNEL: New clip", _avPlayerLayer!.player?.currentItem?.asset as Any)
+        }
     
     }
     
-    fileprivate func _addVideoLayer(withBundlePath:String) -> AVPlayerLayer {
+    fileprivate func _getAvPlayerLayer(fromBundlePath:String) -> AVPlayerLayer {
         
-        let _player:AVPlayer = AVPlayer(url: URL(fileURLWithPath: withBundlePath))
+        let _player:AVPlayer = AVPlayer(url: URL(fileURLWithPath: fromBundlePath))
         let _layer = AVPlayerLayer(player: _player)
         _layer.frame = self.view.bounds
         _layer.videoGravity = AVLayerVideoGravity.resizeAspectFill

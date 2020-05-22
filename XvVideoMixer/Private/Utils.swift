@@ -48,7 +48,7 @@ class Utils {
     }
     
     public class func getRandomFloat() -> Float {
-        return Float(arc4random()) / 0xFFFFFFFF
+        return Float.random(in: 0 ..< 1)
     }
 
 }

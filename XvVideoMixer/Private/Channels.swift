@@ -10,6 +10,9 @@ import Foundation
 
 class Channels:UIViewController {
     
+    fileprivate let debug:Bool = true
+    
+    
     //MARK: Vars
     fileprivate var _channels:[Channel] = []
     
@@ -32,7 +35,7 @@ class Channels:UIViewController {
     
  
     //MARK: Add
-    internal func addChannel(withVideoClipFileNames:[String]){
+    internal func addChannel(withVideoClipFileNames:[String], withRestingtAlpha:CGFloat){
         
         //create channel
         let _channel:Channel = Channel()
@@ -40,12 +43,24 @@ class Channels:UIViewController {
         //pass along clips
         _channel.addVideoClips(withFileNames: withVideoClipFileNames)
         
+        //set target alpha (for channel pulses)
+        _channel.set(restingAlpha: withRestingtAlpha)
+        
         //add to view
         view.addSubview(_channel.view)
         
         //store in array for access
         _channels.append(_channel)
         
+    }
+    
+    //MARK: Multiply render mode
+    internal func set(multiply:Bool, forChannel:Int) {
+        
+        if (forChannel < _channels.count) {
+            
+            _channels[forChannel].set(multiply: multiply)
+        }
     }
     
     //MARK: Alpha
@@ -60,6 +75,7 @@ class Channels:UIViewController {
                 newAlpha = 1.0
             }
             view.alpha = newValue
+            
         }
     }
     
@@ -69,6 +85,26 @@ class Channels:UIViewController {
             
             _channels[forChannel].set(alpha: alpha)
         }
+    }
+    
+    //MARK: channel pulses
+    internal func set(restingAlpha:CGFloat, forChannel:Int){
+        
+        if (forChannel < _channels.count) {
+            
+            _channels[forChannel].set(restingAlpha: alpha)
+        }
+    
+    }
+    
+    internal func pulse(channel:Int){
+        
+        if (channel < _channels.count) {
+            
+            _channels[channel].pulse()
+            
+        }
+        
     }
     
     //MARK: LFO
@@ -101,6 +137,4 @@ class Channels:UIViewController {
             _channel.render()
         }
     }
-    
-    
 }
