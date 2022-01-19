@@ -124,7 +124,7 @@ class Channels:UIViewController {
     
     //MARK: Speed
     //all channels
-    internal func set(speed:Float){
+    internal func set(speed:Double){
         for _channel in _channels {
             _channel.set(speed: speed)
         }

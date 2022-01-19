@@ -234,7 +234,7 @@ class Channel:UIViewController {
     
     //MARK: Speed
     
-    internal func set(speed:Float){
+    internal func set(speed:Double){
         
         if (debug){
             print("CHANNEL: Set speed to", speed)
@@ -242,12 +242,12 @@ class Channel:UIViewController {
         
         
         //speed is coming in as a 0.0-1.0 float. Double it so midway (0.5) is normal speed, below is slower, above is faster
-        let multiplier:Float = speed * 2
+        let multiplier:Double = speed * 2
        
-        let speedAsFloat:Float = Float(SPEED_BASE) * multiplier
+        let speedAsDouble:Double = Double(SPEED_BASE) * multiplier
         
         //apply
-        _currSpeed = Int64(speedAsFloat)
+        _currSpeed = Int64(speedAsDouble)
         
         //makes sure speed is at least 1
         if (_currSpeed < 1) {

@@ -61,8 +61,8 @@ public class XvVideoMixer {
     
     //length of time of pulse anim
     //short times are just a brief burst of image
-    fileprivate var _release:Float = 0.0
-    public var release:Float {
+    fileprivate var _release:Double = 0.0
+    public var release:Double {
         get { return _release }
         set { _release = newValue }
     }
@@ -299,7 +299,7 @@ public class XvVideoMixer {
     
     //MARK: Speed
     
-    public func set(speed:Float){
+    public func set(speed:Double){
         _channels.set(speed: speed)
     }
     
